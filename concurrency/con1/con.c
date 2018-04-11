@@ -72,7 +72,7 @@ void checkRdrand()
         : "=a"(eax), "=b"(ebx), "=c"(ecx), "=d"(edx)
         : "a"(eax));
 
-    isRdrand = ecx & 0x40000000 ? 1 : 0;
+    isRdrand = ecx & 0x40000000;
 }
 
 int randNumber(int min, int max)
@@ -141,6 +141,7 @@ void *Producer()
 int main()
 {
     srand(time(NULL));
+    checkRdrand();
 
     pthread_mutex_init(&mutexVal, NULL);
     pthread_cond_init(&condc, NULL); /* Initialize consumer condition variable */
