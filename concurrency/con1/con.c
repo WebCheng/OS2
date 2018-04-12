@@ -94,7 +94,7 @@ void *Consumer()
         struct value *x = queuePopValues();
         printf("Consumer:%d\n", x->val1);
         //2-9
-        sleep(randNumber(2, 9));
+        sleep(x->val2);
         printf("Consumer:%d\n", x->val2);
 
         /* wake up consumer */
@@ -121,13 +121,15 @@ void *Producer()
 
         //1-9
         int val1 = randNumber(1, 10);
-        sleep(randNumber(1, 5));
-        int val2 = randNumber(1, 10);
+        //3-7 (2 sec + (1~5)sec)
+        sleep(randNumber(1, 6));
+        //2-9
+        int val2 = randNumber(2, 9);
         queueInsValues(val1, val2);
 
         printf("Producer:%d, %d\n", val1, val2);
-        sleep(3);
-        //3-7 
+        //3-7 (2 sec + (1~5)sec)
+        sleep(2);
 
         /* wake up consumer */
         /* release the buffer */
