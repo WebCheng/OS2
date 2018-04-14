@@ -3,14 +3,10 @@
 #include <stdlib.h>
 #include "mt19937ar.h"
 
-#define Buffer_Limit 10
-
-int Buffer_Index_Value = 0;
 int isRdrand = 0;
 int head = 0;
 int tail = 0;
-int value = 0;
-char *Buffer_Queue;
+int valueNum = 0; 
 
 struct value
 {
@@ -28,22 +24,20 @@ void queueInsValues(int val1, int val2)
     queue[tail].val1 = val1;
     queue[tail].val2 = val2;
     tail++;
-    value++;
+    valueNum++;
 }
 
 struct value *queuePopValues()
 {
     if (head == 32)
         head = 0;
-    value--;
+    valueNum--;
     return &(queue[head++]);
 }
 
 int genmt19937(int min, int max)
 {
-    init_genrand(time(NULL));
-    // min to max
-    //1 ~ 9
+    init_genrand(time(NULL)); 
     int x = (int)genrand_int32();
     return (abs(x) % (max - 1)) + min;
 }
@@ -82,83 +76,88 @@ int randNumber(int min, int max)
 
 void *Consumer()
 {
-    int i = 0;
-    while (i < 33)
+    while (1)
     {
         pthread_mutex_lock(&mutexVal);
-        if (value == 0)
+
+        pthread_cond_signal(&condp);
+        pthread_cond_wait(&condc, &mutexVal);
+
+        if (valueNum <= 0)
         {
             printf("Consumer is waiting!!\n");
             pthread_cond_wait(&condc, &mutexVal);
         }
         struct value *x = queuePopValues();
-        printf("Consumer:%d\n", x->val1);
-        //2-9
+        printf("Consumer:%d  valueNum:%d\n", x->val1, valueNum);
+        printf("Consumer:%d  valueNum:%d\n", x->val2, valueNum);
         sleep(x->val2);
-        printf("Consumer:%d\n", x->val2);
 
-        /* wake up consumer */
-        /* release the buffer */
-        pthread_cond_signal(&condp);
         pthread_mutex_unlock(&mutexVal);
-        i++;
     }
-
     pthread_exit(0);
 }
 
 void *Producer()
 {
-    int i = 0;
-    while (i < 33)
+    while (1)
     {
         pthread_mutex_lock(&mutexVal);
-        if (value == 32)
+        if (valueNum >= 32)
         {
             printf("Producer is waiting!\n");
+            pthread_cond_signal(&condc);
             pthread_cond_wait(&condp, &mutexVal);
         }
-
         //1-9
         int val1 = randNumber(1, 10);
-        //3-7 (2 sec + (1~5)sec)
-        sleep(randNumber(1, 6));
-        //2-9
+        sleep(1);
         int val2 = randNumber(2, 9);
         queueInsValues(val1, val2);
 
         printf("Producer:%d, %d\n", val1, val2);
-        //3-7 (2 sec + (1~5)sec)
-        sleep(2);
 
-        /* wake up consumer */
-        /* release the buffer */
         pthread_cond_signal(&condc);
+        pthread_cond_wait(&condp, &mutexVal);
+
         pthread_mutex_unlock(&mutexVal);
-        i++;
     }
     pthread_exit(0);
 }
 
-int main()
+int main(int argc, char *argv[])
 {
-    srand(time(NULL));
+    int threadNum, i;
+
+    if (argc <= 1)
+    {
+        printf("Note: for multiple threads pairs run './concurrency1 5'\n\n");
+        threadNum = 1;
+    }
+    else
+        threadNum = atoi(argv[1]);
+
     checkRdrand();
 
     pthread_mutex_init(&mutexVal, NULL);
     pthread_cond_init(&condc, NULL); /* Initialize consumer condition variable */
     pthread_cond_init(&condp, NULL); /* Initialize producer condition variable */
 
-    pthread_t producerThread, consumerThread;
-    pthread_create(&producerThread, NULL, Producer, NULL);
-    pthread_create(&consumerThread, NULL, Consumer, NULL);
+    threadNum = threadNum * 2;
+    pthread_t threads[threadNum];
 
-    pthread_join(producerThread, NULL);
-    pthread_join(consumerThread, NULL);
+    /*create threads*/
+    for (i = 0; i < threadNum; i++)
+    {
+        pthread_create(&threads[i], NULL, Consumer, NULL);
+        pthread_create(&threads[i++], NULL, Producer, NULL);
+    }
 
-    /* Free up the_mutex */
-    /* Free up consumer condition variable */
-    /* Free up producer condition variable */
+    /*join threads*/
+    for (i = 0; i < threadNum; i++)
+        pthread_join(threads[i], NULL);
+
+    /* Free up  */
     pthread_mutex_destroy(&mutexVal);
     pthread_cond_destroy(&condc);
     pthread_cond_destroy(&condp);
