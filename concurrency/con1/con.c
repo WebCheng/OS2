@@ -35,6 +35,7 @@ struct value *queuePopValues()
     return &(queue[head++]);
 }
 
+/*generate mt19937 number*/
 int genmt19937(int min, int max)
 {
     init_genrand(time(NULL)); 
@@ -42,6 +43,7 @@ int genmt19937(int min, int max)
     return (abs(x) % (max - 1)) + min;
 }
 
+/*Generate rdrand number*/
 int rdrandNumber(int min, int max)
 {
     unsigned int gen;
@@ -57,6 +59,7 @@ int rdrandNumber(int min, int max)
         return 0;
 }
 
+/*Checking CPU for rdrand method(random number)*/
 void checkRdrand()
 {
     unsigned int eax, ebx, ecx, edx;
@@ -69,6 +72,7 @@ void checkRdrand()
     isRdrand = ecx & 0x40000000;
 }
 
+/*Switch randon number method*/
 int randNumber(int min, int max)
 {
     return isRdrand ? rdrandNumber(min, max) : genmt19937(min, max);
@@ -79,21 +83,26 @@ void *Consumer()
     while (1)
     {
         pthread_mutex_lock(&mutexVal);
-
-        pthread_cond_signal(&condp);
-        pthread_cond_wait(&condc, &mutexVal);
+        
+        /*Wake up producer before consuming*/
+        // pthread_cond_signal(&condp);
+        // pthread_cond_wait(&condc, &mutexVal);
 
         if (valueNum <= 0)
         {
             printf("Consumer is waiting!!\n");
+            pthread_cond_signal(&condp);
             pthread_cond_wait(&condc, &mutexVal);
         }
         struct value *x = queuePopValues();
         printf("Consumer:%d  valueNum:%d\n", x->val1, valueNum);
         printf("Consumer:%d  valueNum:%d\n", x->val2, valueNum);
-        sleep(x->val2);
+        /*Work done sleep*/
+        //sleep(x->val2);
 
         pthread_mutex_unlock(&mutexVal);
+        pthread_cond_signal(&condp);
+        sleep(x->val2);
     }
     pthread_exit(0);
 }
@@ -111,46 +120,53 @@ void *Producer()
         }
         //1-9
         int val1 = randNumber(1, 10);
+        /*Sleep for random number*/
         sleep(1);
         int val2 = randNumber(2, 9);
         queueInsValues(val1, val2);
 
         printf("Producer:%d, %d\n", val1, val2);
-
-        pthread_cond_signal(&condc);
-        pthread_cond_wait(&condp, &mutexVal);
+        
+        /*Every time wait consumers*/
+        //pthread_cond_signal(&condc);
+        //pthread_cond_wait(&condp, &mutexVal);
 
         pthread_mutex_unlock(&mutexVal);
+
+        pthread_cond_signal(&condc);
+
+        sleep(randNumber(2, 6)); 
     }
     pthread_exit(0);
 }
 
 int main(int argc, char *argv[])
 {
-    int threadNum, i;
-
+    int threadNum;
+    /*No thread number input(default = 1)*/
     if (argc <= 1)
-    {
-        printf("Note: for multiple threads pairs run './concurrency1 5'\n\n");
-        threadNum = 1;
-    }
+        threadNum = 1 * 2;
     else
-        threadNum = atoi(argv[1]);
+        threadNum = atoi(argv[1]) * 2;
 
     checkRdrand();
 
+    /* Initialize producer condition variable */
     pthread_mutex_init(&mutexVal, NULL);
-    pthread_cond_init(&condc, NULL); /* Initialize consumer condition variable */
-    pthread_cond_init(&condp, NULL); /* Initialize producer condition variable */
+    pthread_cond_init(&condc, NULL); 
+    pthread_cond_init(&condp, NULL); 
 
-    threadNum = threadNum * 2;
+    /*Pair thread for Consumer and Producer*/
+    //threadNum = threadNum * 2;
     pthread_t threads[threadNum];
 
     /*create threads*/
+    int i;
     for (i = 0; i < threadNum; i++)
     {
+        pthread_create(&threads[i], NULL, Producer, NULL);
+        i++;
         pthread_create(&threads[i], NULL, Consumer, NULL);
-        pthread_create(&threads[i++], NULL, Producer, NULL);
     }
 
     /*join threads*/
