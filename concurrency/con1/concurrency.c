@@ -6,7 +6,7 @@
 int isRdrand = 0;
 int head = 0;
 int tail = 0;
-int valueNum = 0; 
+int valueNum = 0;
 
 struct value
 {
@@ -31,14 +31,13 @@ struct value *queuePopValues()
 {
     if (head == 32)
         head = 0;
-    valueNum--;
     return &(queue[head++]);
 }
 
 /*generate mt19937 number*/
 int genmt19937(int min, int max)
 {
-    init_genrand(time(NULL)); 
+    init_genrand(time(NULL));
     int x = (int)genrand_int32();
     return (abs(x) % (max - 1)) + min;
 }
@@ -83,7 +82,7 @@ void *Consumer()
     while (1)
     {
         pthread_mutex_lock(&mutexVal);
-        
+
         /*Wake up producer before consuming*/
         // pthread_cond_signal(&condp);
         // pthread_cond_wait(&condc, &mutexVal);
@@ -94,6 +93,7 @@ void *Consumer()
             pthread_cond_signal(&condp);
             pthread_cond_wait(&condc, &mutexVal);
         }
+        valueNum--;
         struct value *x = queuePopValues();
         printf("Consumer:%d  valueNum:%d\n", x->val1, valueNum);
         printf("Consumer:%d  valueNum:%d\n", x->val2, valueNum);
@@ -126,7 +126,7 @@ void *Producer()
         queueInsValues(val1, val2);
 
         printf("Producer:%d, %d\n", val1, val2);
-        
+
         /*Every time wait consumers*/
         //pthread_cond_signal(&condc);
         //pthread_cond_wait(&condp, &mutexVal);
@@ -135,7 +135,7 @@ void *Producer()
 
         pthread_cond_signal(&condc);
 
-        sleep(randNumber(2, 6)); 
+        sleep(randNumber(2, 6));
     }
     pthread_exit(0);
 }
@@ -153,8 +153,8 @@ int main(int argc, char *argv[])
 
     /* Initialize producer condition variable */
     pthread_mutex_init(&mutexVal, NULL);
-    pthread_cond_init(&condc, NULL); 
-    pthread_cond_init(&condp, NULL); 
+    pthread_cond_init(&condc, NULL);
+    pthread_cond_init(&condp, NULL);
 
     /*Pair thread for Consumer and Producer*/
     //threadNum = threadNum * 2;
