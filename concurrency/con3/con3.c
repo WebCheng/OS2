@@ -2,6 +2,7 @@
 #include <pthread.h>
 #include <stdlib.h>
 #include <semaphore.h>
+#define BUFFER_SIZE 32
 
 /*LOCK same kind of thread (DELETE, INSERT)*/
 pthread_mutex_t mutexDele;
@@ -13,7 +14,28 @@ pthread_mutex_t mutexSerDele;
 sem_t empty;
 sem_t full;
 
-int buff[32], bufNum = 0;
+/*Assume buffer max siz*/
+int bufNum = 0, buf[BUFFER_SIZE];
+int headIdx = 0, tailIdx = 0;
+
+void bufferPush(int val)
+{
+    buf[tailIdx] = val;
+    bufNum++;
+    tailIdx++;
+    if (tailIdx >= BUFFER_SIZE)
+        tailIdx = 0;
+}
+
+int bufferPull()
+{
+    int x = buf[headIdx];
+    headIdx++;
+    if (headIdx >= BUFFER_SIZE)
+        headIdx = 0;
+    bufNum--;
+    return x;
+}
 
 int randNumber(int min, int max)
 {
@@ -24,11 +46,11 @@ void *Search()
 {
     while (1)
     {
-        /* Wait for delete to finish here */ 
+        /* Wait for delete to finish here */
         pthread_mutex_lock(&mutexSerDele);
         printf("Searcher --> %d\n", bufNum);
         pthread_mutex_unlock(&mutexSerDele);
-        
+
         sleep(randNumber(2, 5));
     }
 }
@@ -40,13 +62,15 @@ void *Insert()
         sem_wait(&empty);
         pthread_mutex_lock(&mutexInsDele);
 
-        bufNum++;
-        printf("Inserter --> %d\n", bufNum);
+        int val = randNumber(3, 7);
+        bufferPush(val);
+
+        printf("Inserter --> %d | %d\n", bufNum, val);
 
         pthread_mutex_unlock(&mutexInsDele);
         sem_post(&full);
-        
-        sleep(randNumber(3, 7));
+
+        sleep(val);
     }
 }
 
@@ -58,8 +82,8 @@ void *Delete()
         pthread_mutex_lock(&mutexInsDele);
         pthread_mutex_lock(&mutexSerDele);
 
-        bufNum--;
-        printf("Deleter -_-> %d\n", bufNum);
+        int val = bufferPull();
+        printf("Deleter ---> %d | %d\n", bufNum, val);
 
         sem_post(&empty);
         pthread_mutex_unlock(&mutexInsDele);
@@ -71,16 +95,25 @@ void *Delete()
 
 int main(int argc, char *argv[])
 {
-    int serNum = 2, insNum = 3, deleNum = 2;
+    if (argc != 4)
+    {
+        printf("COMMAND LINE$ con3 <Searcher threads> <Inserter threads> <Deleter threads>\n");
+        return -1;
+    }
+    int serNum = atoi(argv[1]), insNum = atoi(argv[2]), deleNum = atoi(argv[3]);
+
     srand(time(NULL));
+    // int serNum = 2, insNum = 3, deleNum = 2;
+
     pthread_t searcher[serNum], inserter[insNum], deleter[deleNum];
 
     pthread_mutex_init(&mutexInsDele, NULL);
     pthread_mutex_init(&mutexSerDele, NULL);
 
-    sem_init(&empty, 0, 32);
+    sem_init(&empty, 0, BUFFER_SIZE);
     sem_init(&full, 0, 0);
 
+    printf("Action -- BufSize -- BufNum\n");
     int i;
     for (i = 0; i < serNum; i++)
         pthread_create(&searcher[i], NULL, Search, NULL);
