@@ -19,7 +19,7 @@ gcc -o concurrency2 concurrency2.c -lpthread
 #define LEFT (phnum + 4) % N
 #define RIGHT (phnum + 1) % N
 
-int phiState[N];
+int phiState[N]; 
 char *phi[N] = {"Confucius", "Plato", "Buddha", "Aristotle", "Laozi"};
 
 /*Only one Philosopher can take/put the fork at the time*/
@@ -75,7 +75,10 @@ void *philospher(void *num)
         takeFork(*i);
 
         /*2-9 seconds.*/
-        printf("Philosopher %10s is Eating!!\n", phi[*i]);
+        printf("Philosopher %10s is Eating!! takes fork %d and %d \n"
+            , phi[*i]
+            , ((*i + 4) % N) + 1
+            , *i + 1);
         sleep((rand() % 8 + 2));
 
         putFork(*i);
