@@ -12,9 +12,29 @@ As long as there are fewer than three processes using the resource, new processe
 Once there are three processes using the resource, all three must leave before any new processes can begin using it.
 Implement a mutual exclusion solution that meets the above constraints.
 
+Solution design for problem1
+process()
+{
+  lock mutex1
+  if count == 3 then
+    sem wait;
+  count++
+  unlock mutex1
+  
+  ......Do something
+  
+  lock mutex2
+  count--
+  if count == 0 then
+    sem post;
+  unlock mutex1
+}
+
 Problem 2
 Three kinds of threads share access to a singly-linked list: 
 searchers, inserters and deleters. Searchers merely examine the list; hence they can execute concurrently with each other. 
 Inserters add new items to the end of the list; insertions must be mutually exclusive to preclude two inserters from inserting new items at about the same time. 
 However, one insert can proceed in parallel with any number of searches. 
 Finally, deleters remove items from anywhere in the list. At most one deleter process can access the list at a time, and deletion must also be mutually exclusive with searches and insertions.
+
+Solution idea for problem2
