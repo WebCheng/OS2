@@ -5,8 +5,8 @@
 #define BUFFER_SIZE 32
 
 /*LOCK same kind of thread (DELETE, INSERT)*/
-pthread_mutex_t mutexDele;
-pthread_mutex_t mutexInse;
+pthread_mutex_t mutexVal1;
+pthread_mutex_t mutexVal2;
 
 /*LOCK between two kind of threads (INSERT, DELETE) (DELET, SEARCH)*/
 pthread_mutex_t mutexInsDele;
@@ -42,18 +42,47 @@ int randNumber(int min, int max)
     return rand() % (max + 1 - min) + min;
 }
 
+int curNum;
+char lockerName;
 void *Search()
 {
     while (1)
     {
-        /* Wait for delete to finish here 
-         * Using pthread_mutex_trylock to avoid lock others searcher threads  */  
+        pthread_mutex_lock(&mutexVal1);
         if (pthread_mutex_trylock(&mutexSerDele) == 0)
+            lockerName = 'S';
+        else
         {
-            printf("Searcher --> %d\n", bufNum);
+            if (lockerName == 'D')
+                pthread_mutex_lock(&mutexSerDele);
+            else // == "S"
+            {
+                /*If searching threads are too many wait*/
+                if (curNum == 3)
+                {
+                    printf("Search process Full!!\n");
+                    pthread_mutex_lock(&mutexSerDele);
+                }
+            }
+        }
+        curNum++;
+        pthread_mutex_unlock(&mutexVal1);
+
+        /*Searching Execution */
+        int val = randNumber(2, 4);
+        printf("Searching --> %d     \n", curNum);
+        sleep(val);
+
+        pthread_mutex_lock(&mutexVal2);
+        curNum--;
+        if (curNum == 0)
+        {
+            printf("Process Clear!!\n");
+            lockerName = 'D';
             pthread_mutex_unlock(&mutexSerDele);
         }
-        sleep(1); 
+        pthread_mutex_unlock(&mutexVal2);
+        sleep(randNumber(5, 10));
     }
 }
 
@@ -86,8 +115,8 @@ void *Delete()
     while (1)
     {
         sem_wait(&full);
-        pthread_mutex_lock(&mutexInsDele);
         pthread_mutex_lock(&mutexSerDele);
+        pthread_mutex_lock(&mutexInsDele);
         printf("Deleter -------->  Start \n");
 
         int val = bufferPull();
@@ -121,6 +150,8 @@ int main(int argc, char *argv[])
 
     pthread_mutex_init(&mutexInsDele, NULL);
     pthread_mutex_init(&mutexSerDele, NULL);
+    pthread_mutex_init(&mutexVal1, NULL);
+    pthread_mutex_init(&mutexVal2, NULL);
 
     sem_init(&empty, 0, BUFFER_SIZE);
     sem_init(&full, 0, 0);
