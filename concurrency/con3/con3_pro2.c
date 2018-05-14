@@ -15,26 +15,49 @@ sem_t empty;
 sem_t full;
 
 /*Assume buffer max siz*/
-int bufNum = 0, buf[BUFFER_SIZE];
-int headIdx = 0, tailIdx = 0;
-
-void bufferPush(int val)
+struct link
 {
-    buf[tailIdx] = val;
-    bufNum++;
-    tailIdx++;
-    if (tailIdx >= BUFFER_SIZE)
-        tailIdx = 0;
+    int value;
+    struct link *next;
+};
+
+struct single_link
+{
+    struct link *head;
+    struct link *tail;
+    int count;
+} * Link;
+
+void InsertValue(int val)
+{
+    struct link *newLink;
+    newLink = malloc(sizeof(struct link));
+    newLink->value = val;
+    newLink->next = NULL;
+
+    if (Link->tail)
+        Link->tail->next = newLink;
+
+    Link->tail = newLink;
+
+    if (!Link->head)
+        Link->head = newLink;
+
+    Link->count++;
 }
 
-int bufferPull()
+int RemoveValue()
 {
-    int x = buf[headIdx];
-    headIdx++;
-    if (headIdx >= BUFFER_SIZE)
-        headIdx = 0;
-    bufNum--;
-    return x;
+    struct link *head = Link->head;   
+    int val = head->value;
+    Link->head = head->next;
+    Link->count++;
+
+    if (Link->tail == head)
+        Link->tail = NULL; 
+
+    free(head); 
+    return val;
 }
 
 int randNumber(int min, int max)
@@ -46,6 +69,7 @@ int curNum;
 char lockerName;
 void *Search()
 {
+    int val;
     while (1)
     {
         pthread_mutex_lock(&mutexVal1);
@@ -69,7 +93,7 @@ void *Search()
         pthread_mutex_unlock(&mutexVal1);
 
         /*Searching Execution */
-        int val = randNumber(2, 4);
+        val = randNumber(2, 4);
         printf("Searching --> %d     \n", curNum);
         sleep(val);
 
@@ -88,16 +112,17 @@ void *Search()
 
 void *Insert()
 {
+    int val;
     while (1)
     {
         sem_wait(&empty);
         pthread_mutex_lock(&mutexInsDele);
         printf("Inserter ------>  Start \n");
 
-        int val = randNumber(3, 7);
-        bufferPush(val);
+        val = randNumber(3, 7);
+        InsertValue(val);
 
-        printf("Inserter --> %d | %d\n", bufNum, val);
+        printf("Inserter --> %d | %d\n", Link->count, val);
 
         /*Testing other threads*/
         sleep(1);
@@ -112,6 +137,7 @@ void *Insert()
 
 void *Delete()
 {
+    int val;
     while (1)
     {
         sem_wait(&full);
@@ -119,8 +145,8 @@ void *Delete()
         pthread_mutex_lock(&mutexInsDele);
         printf("Deleter -------->  Start \n");
 
-        int val = bufferPull();
-        printf("Deleter ---> %d | %d\n", bufNum, val);
+        val = RemoveValue();
+        printf("Deleter ---> %d | %d\n", Link->count, val);
 
         /*Testing other threads*/
         sleep(1);
@@ -143,6 +169,11 @@ int main(int argc, char *argv[])
     }
     int serNum = atoi(argv[1]), insNum = atoi(argv[2]), deleNum = atoi(argv[3]);
 
+    Link = malloc(sizeof(struct single_link));
+    Link->head = NULL;
+    Link->tail = NULL;
+    Link->count = 0;
+
     srand(time(NULL));
     // int serNum = 2, insNum = 3, deleNum = 2;
 
@@ -156,7 +187,7 @@ int main(int argc, char *argv[])
     sem_init(&empty, 0, BUFFER_SIZE);
     sem_init(&full, 0, 0);
 
-    printf("\n\n\nAction | BufSize | BufNum\n");
+    printf("\n\n\nAction | Link Size | Link Value\n");
     int i;
     for (i = 0; i < serNum; i++)
         pthread_create(&searcher[i], NULL, Search, NULL);
