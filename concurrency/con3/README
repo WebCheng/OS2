@@ -27,7 +27,7 @@ process()
   count--
   if count == 0 then
     sem post;
-  unlock mutex1
+  unlock mutex2
 }
 
 Problem 2
@@ -37,4 +37,56 @@ Inserters add new items to the end of the list; insertions must be mutually excl
 However, one insert can proceed in parallel with any number of searches. 
 Finally, deleters remove items from anywhere in the list. At most one deleter process can access the list at a time, and deletion must also be mutually exclusive with searches and insertions.
 
-Solution idea for problem2
+Solution design for problem2
+
+// Using problem 1 solution Concept to approach Searcher Demands.
+// Problems:
+// 1. When Searcher LOCK MUTEX_DELETE_SEARTCH, it will lock other seacher threads.
+// 2. Deleter need to wait all searcher complete their job.
+// 3. Using problem 1 solution need to set the limite number of executing threads to avoid deleter cannot get mutex.
+Search (){
+  
+  Mutex_lock (MUTEX1)
+  if Mutex_trylock(MUTEX_DELETE_SEARTCH) == Fail then
+      if LOCKER == DELETE then
+          Mutex_lock(MUTEX_DELETE_SEARTCH);
+      else 
+          if SearchCounts == 3 then
+            Mutex_lock(MUTEX_DELETE_SEARTCH);
+            
+  count++
+  Mutex_unlock (MUTEX1)
+  
+  
+  
+  .......Do Some Things...........
+  
+  Mutex_lock MUTEX2
+  count--
+  if count == 0 then    
+      Mutex_unlock(MUTEX_DELETE_SEARTCH)
+  Mutex_lock MUTEX2
+}
+
+
+// MUTEX_DELETE_INSERT will also lock other inserter to avoid mutiple inserters running.
+Insert (){
+  Mutex_lock (MUTEX_DELETE_INSERT)
+  .......Do Some Things...........
+  Mutex_unlock(MUTEX_DELETE_INSERT)
+}
+
+Delete (){
+  Mutex_lock (MUTEX_DELETE_SEARTCH)
+  Mutex_lock (MUTEX_DELETE_INSERT)
+  .......Do Some Things...........
+  Mutex_unlock(MUTEX_DELETE_INSERT)
+  Mutex_lock (MUTEX_DELETE_SEARTCH)
+}
+
+
+
+
+
+
+
