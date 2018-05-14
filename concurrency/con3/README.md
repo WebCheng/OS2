@@ -1,4 +1,4 @@
-COMMAND LINE
+#COMMAND LINE
 $ make
 $ con3_pro1 <pthreads Number>
 $ con3_pro2 <Searcher threads Number> <Inserter threads Number> <Deleter threads Number>
