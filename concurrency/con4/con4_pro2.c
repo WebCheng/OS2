@@ -6,156 +6,119 @@
 #include <errno.h>
 #include <unistd.h>
 
-sem_t agent_ready;
+pthread_mutex_t agentLckMtx;
+pthread_mutex_t pusherLockMtx;
+sem_t smokerSem[3];
+sem_t pusherSem[3];
 
-sem_t smoker_semaphors[3];
+char *smokeType[3] = {"matches & tobacco", "matches & paper", "tobacco & paper"};
+/*matches, tobacco, paper*/
+int itemStates[3] = {0, 0, 0};
 
-char* smoker_types[3] = { "matches & tobacco", "matches & paper", "tobacco & paper" };
-
-bool items_on_table[3] = { false, false, false };
-
-sem_t pusher_semaphores[3];
-
-void* smoker(void* arg)
+int randNumber(int min, int max)
 {
-    int smoker_id = *(int*) arg;
-    int type_id   = smoker_id % 3;
+    return rand() % (max + 1 - min) + min;
+}
 
-    for (int i = 0; i < 3; ++i)
+void *smoker(void *arg)
+{
+    int smokerId = *(int *)arg;
+    int idx = smokerId % 3;
+
+    while (1)
     {
-        printf("\033[0;37mSmoker %d \033[0;31m>>\033[0m Waiting for %s\n",
-                smoker_id, smoker_types[type_id]);
+        printf("Smoker %d >> Waiting for %s\n", smokerId, smokeType[idx]);
 
-        sem_wait(&smoker_semaphors[type_id]);
+        sem_wait(&smokerSem[idx]);
 
-        printf("\033[0;37mSmoker %d \033[0;32m<<\033[0m Now making the a cigarette\n", smoker_id);
-        usleep(rand() % 50000);
-        sem_post(&agent_ready);
+        printf("Smoker %d << Now making the a cigarette\n", smokerId);
+        sleep(randNumber(2, 5));
+        pthread_mutex_unlock(&agentLckMtx);
 
-        printf("\033[0;37mSmoker %d \033[0;37m--\033[0m Now smoking\n", smoker_id);
-        usleep(rand() % 50000);
+        printf("Smoker %d -- Now smoking\n", smokerId);
+        sleep(randNumber(2, 5));
     }
 
     return NULL;
 }
 
-sem_t pusher_lock;
-
-void* pusher(void* arg)
+void *pusher(void *arg)
 {
-    int pusher_id = *(int*) arg;
+    int puserId = *(int *)arg;
 
-    for (int i = 0; i < 12; ++i)
-    { 
-        sem_wait(&pusher_semaphores[pusher_id]);
-        sem_wait(&pusher_lock);
+    while (1)
+    {
+        sem_wait(&pusherSem[puserId]);
+        pthread_mutex_lock(&pusherLockMtx);
 
-        if (items_on_table[(pusher_id + 1) % 3])
+        if (itemStates[(puserId + 1) % 3])
         {
-            items_on_table[(pusher_id + 1) % 3] = false;
-            sem_post(&smoker_semaphors[(pusher_id + 2) % 3]);
+            itemStates[(puserId + 1) % 3] = 0;
+            sem_post(&smokerSem[puserId]);
         }
-        else if (items_on_table[(pusher_id + 2) % 3])
+        else if (itemStates[(puserId + 2) % 3])
         {
-            items_on_table[(pusher_id + 2) % 3] = false;
-            sem_post(&smoker_semaphors[(pusher_id + 1) % 3]);
+            itemStates[(puserId + 2) % 3] = 0;
+            sem_post(&smokerSem[(puserId + 2) % 3]);
         }
         else
-        { 
-            items_on_table[pusher_id] = true;
+        {
+            itemStates[puserId] = 1;
         }
 
-        sem_post(&pusher_lock);
+        pthread_mutex_unlock(&pusherLockMtx);
     }
 
     return NULL;
 }
 
-void* agent(void* arg)
+void *agent(void *arg)
 {
-    int agent_id = *(int*) arg;
+    int agent_id = *(int *)arg;
 
-    for (int i = 0; i < 6; ++i)
+    while (1)
     {
-        usleep(rand() % 200000);
+        sleep(randNumber(0, 2));
 
-        sem_wait(&agent_ready);
+        pthread_mutex_lock(&agentLckMtx);
 
-        sem_post(&pusher_semaphores[agent_id]);
-        sem_post(&pusher_semaphores[(agent_id + 1) % 3]);
+        sem_post(&pusherSem[agent_id]);
+        sem_post(&pusherSem[(agent_id + 1) % 3]);
 
-        printf("\033[0;35m==> \033[0;33mAgent %d giving out %s\033[0;0m\n",
-                agent_id, smoker_types[(agent_id + 2) % 3]);
+        printf("Agent %d giving out %s\n", agent_id, smokeType[agent_id]);
     }
 
     return NULL;
 }
 
-int main(int argc, char* arvg[])
-{ 
+int main(int argc, char *arvg[])
+{
+    int i;
     srand(time(NULL));
+    pthread_mutex_init(&agentLckMtx, NULL);
+    pthread_mutex_init(&pusherLockMtx, NULL);
 
-    sem_init(&agent_ready, 0, 1);
-
-    sem_init(&pusher_lock, 0, 1);
-
-    for (int i = 0; i < 3; ++i)
+    for (i = 0; i < 3; ++i)
     {
-        sem_init(&smoker_semaphors[i], 0, 0);
-        sem_init(&pusher_semaphores[i], 0, 0);
+        sem_init(&smokerSem[i], 0, 0);
+        sem_init(&pusherSem[i], 0, 0);
     }
 
+    int args[3];
+    pthread_t pusherThd[3];
+    pthread_t agentThd[3];
+    pthread_t smokerThd[3];
 
-
-    int smoker_ids[6];
-
-    pthread_t smoker_threads[6];
-
-    for (int i = 0; i < 6; ++i)
+    for (i = 0; i < 3; ++i)
     {
-        smoker_ids[i] = i;
-
-        if (pthread_create(&smoker_threads[i], NULL, smoker, &smoker_ids[i]) == EAGAIN)
-        {
-            perror("Insufficient resources to create thread");
-            return 0;
-        }
+        args[i] = i;
+        pthread_create(&smokerThd[i], NULL, smoker, &args[i]);
+        pthread_create(&pusherThd[i], NULL, pusher, &args[i]);
+        pthread_create(&agentThd[i], NULL, agent, &args[i]);
     }
 
-    int pusher_ids[6];
-
-    pthread_t pusher_threads[6];
-
-    for (int i = 0; i < 3; ++i)
-    {
-        pusher_ids[i] = i;
-
-        if (pthread_create(&pusher_threads[i], NULL, pusher, &pusher_ids[i]) == EAGAIN)
-        {
-            perror("Insufficient resources to create thread");
-            return 0;
-        }
-    }
-
-    int agent_ids[6];
-
-    pthread_t agent_threads[6];
-
-    for (int i = 0; i < 3; ++i)
-    {
-        agent_ids[i] =i;
-
-        if (pthread_create(&agent_threads[i], NULL, agent, &agent_ids[i]) == EAGAIN)
-        {
-            perror("Insufficient resources to create thread");
-            return 0;
-        }
-    }
-
-    for (int i = 0; i < 6; ++i)
-    {
-        pthread_join(smoker_threads[i], NULL);
-    }
+    for (i = 0; i < 3; ++i)
+        pthread_join(smokerThd[i], NULL);
 
     return 0;
 }

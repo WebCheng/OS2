@@ -15,7 +15,6 @@ pthread_mutex_t access_mutex;
 pthread_mutex_t barber_chair_mutex;
 pthread_mutex_t hair_cut_mutex;
 sem_t hairComplete;
-sem_t waitingChairs;
 int waitChairs;
 
 int randNumber(int min, int max)
@@ -35,6 +34,7 @@ void *barber()
 
         /*Hair Cut 3 to 6 Secs*/
         sleep(randNumber(3, 6));
+
         printf("Barber FINISH cuting hair\n");
         sem_post(&hairComplete);
         pthread_mutex_unlock(&barber_chair_mutex);
@@ -57,8 +57,7 @@ void *customer(void *arg)
             pthread_mutex_unlock(&hair_cut_mutex);
             printf("Barber START cuting No.%d hair.\n", cust_no);
 
-            sem_wait(&hairComplete);
-            //printf("Customer No.%d FINISH cutting.\n", cust_no);
+            sem_wait(&hairComplete); 
             sleep(randNumber(3, 6));
         }
         else
@@ -89,14 +88,13 @@ int main(int argc, char *argv[])
 
     srand(time(NULL));
 
-    pthread_mutex_init(&barber_chair_mutex, NULL);
-
+    pthread_mutex_init(&barber_chair_mutex, NULL); 
     pthread_mutex_init(&hair_cut_mutex, NULL);
-    pthread_mutex_lock(&hair_cut_mutex);
-
     pthread_mutex_init(&access_mutex, NULL);
-    waitChairs = chairsNum;
+
+    pthread_mutex_lock(&hair_cut_mutex);
     sem_init(&hairComplete, 0, 0);
+    waitChairs = chairsNum;
 
     pthread_t thread_barber;
     pthread_t thread_customers[custNum];
@@ -107,11 +105,8 @@ int main(int argc, char *argv[])
         args[i] = i;
 
     pthread_create(&thread_barber, NULL, barber, NULL);
-    for (i = 0; i < custNum; i++)
-    {
-        //printf("%d\n", args[i]);
-        pthread_create(&thread_customers[i], NULL, customer, (void *)&args[i]);
-    }
+    for (i = 0; i < custNum; i++) 
+        pthread_create(&thread_customers[i], NULL, customer, (void *)&args[i]); 
 
     pthread_join(thread_barber, NULL);
     for (i = 0; i < custNum; i++)
